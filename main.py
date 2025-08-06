@@ -132,5 +132,5 @@ def ask_chatbot():
 if __name__ == '__main__':
     # データベースの初期化
     init_db()
-    app.run(debug=True, port=5001)
+    app.run(debug=True, port=5003)
 
