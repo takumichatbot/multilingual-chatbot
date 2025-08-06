@@ -26,15 +26,14 @@ body {
 
 /* ヘッダー */
 .chatbot-header {
-    background-color: hsl(157, 80%, 72%); /* アールフラワーのイメージカラー */
-    color: rgba(0, 0, 0, 0.596);
-    padding: 20px;
-    font-size: 1.4em;
-    font-weight: bold;
+    background-color: #3b5998; /* ヘッダーの背景色を修正 */
+    color: white;
+    padding: 10px;
     text-align: center;
     border-top-left-radius: 10px;
     border-top-right-radius: 10px;
 }
+
 
 /* メッセージエリア */
 .chatbot-messages {
@@ -90,11 +89,11 @@ body {
 
 .chatbot-input input:focus {
     outline: none;
-    border-color: #3b5998;
+    border-color: #5ce7ce;
 }
 
 .chatbot-input button {
-    background-color: #3b5998;
+    background-color: #5ce7ce;
     color: #fff;
     border: none;
     border-radius: 20px;
@@ -106,7 +105,7 @@ body {
 }
 
 .chatbot-input button:hover {
-    background-color: #3b5998;
+    background-color: #5ce7ce;
 }
 
 /* 質問例ボタンコンテナ */
