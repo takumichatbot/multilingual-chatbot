@@ -65,7 +65,7 @@ body {
 
 /* ユーザーのメッセージ */
 .user-message {
-    background-color: #5ce7ce;
+    background-color: #3b5998;
     color: #fff;
     align-self: flex-end;
     border-top-right-radius: 5px;
@@ -90,11 +90,11 @@ body {
 
 .chatbot-input input:focus {
     outline: none;
-    border-color: #5ce7ce;
+    border-color: #3b5998;
 }
 
 .chatbot-input button {
-    background-color: #5ce7ce;
+    background-color: #3b5998;
     color: #fff;
     border: none;
     border-radius: 20px;
@@ -106,7 +106,7 @@ body {
 }
 
 .chatbot-input button:hover {
-    background-color: #5ce7ce;
+    background-color: #3b5998;
 }
 
 /* 質問例ボタンコンテナ */
