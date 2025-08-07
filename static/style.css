@@ -26,12 +26,12 @@ body {
 
 /* ヘッダー */
 .chatbot-header {
-    background-color: #3b5998; /* ヘッダーの背景色を修正 */
-    color: white;
-    padding: 10px;
+    background-color: #3b5998;
+    color: #fff;
+    padding: 15px;
     text-align: center;
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
+    font-size: 1.2em;
+    font-weight: bold;
 }
 
 
