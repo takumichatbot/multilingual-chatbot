@@ -1,10 +1,9 @@
 # main.py
-from flask import Flask, render_template, request, jsonify, g
+from flask import Flask, render_template, request, jsonify
 import os
 from dotenv import load_dotenv
 import google.generativeai as genai
 from qa_data import QA_DATA
-import sqlite3
 
 load_dotenv()
 
@@ -15,34 +14,8 @@ genai.configure(api_key=GOOGLE_API_KEY)
 
 app = Flask(__name__)
 
-# データベース接続
-def get_db():
-    db = getattr(g, '_database', None)
-    if db is None:
-        db = g._database = sqlite3.connect('history.db')
-        db.row_factory = sqlite3.Row  # 辞書形式で結果を取得するために設定
-    return db
-
-# データベース初期化
-def init_db():
-    with app.app_context():
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                sender TEXT NOT NULL,
-                message TEXT NOT NULL,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
-        db.commit()
-
-@app.teardown_appcontext
-def close_connection(exception):
-    db = getattr(g, '_database', None)
-    if db is not None:
-        db.close()
+# QAデータをプロンプトに組み込むためのテキストを作成
+qa_prompt_text = "\n\n".join([f"### {key}\n{value}" for key, value in QA_DATA['data'].items()])
 
 def get_gemini_answer(question):
     print(f"質問: {question}")
@@ -50,35 +23,16 @@ def get_gemini_answer(question):
         model = genai.GenerativeModel('models/gemini-1.5-flash')
         print("Geminiモデルを初期化しました")
 
-        # データベースから過去の会話履歴を取得
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute('SELECT sender, message FROM messages ORDER BY timestamp')
-        history = cursor.fetchall()
-        
-        # QA_DATAと会話履歴をプロンプトに組み込む
-        qa_string = ""
-        for key, value in QA_DATA.items():
-            qa_string += f"### {key}\n{value}\n"
-
-        history_string = ""
-        for message in history:
-            history_string += f"{message['sender']}: {message['message']}\n"
-        
+        # QA_DATAをプロンプトに組み込む
         full_question = f"""
         あなたはLARUbotのカスタマーサポートAIです。
         以下の「ルール・規則」セクションに記載されている情報のみに基づいて、お客様からの質問に絵文字を使わずに丁寧に回答してください。
         **記載されていない質問には「申し訳ありませんが、その情報はこのQ&Aには含まれていません。」と答えてください。**
         お客様がスムーズに手続きを進められるよう、元気で丁寧な言葉遣いで案内してください。
-
-        ---
-        ## ルール・規則
-        {qa_string}
-        ---
         
         ---
-        ## これまでの会話履歴
-        {history_string}
+        ## ルール・規則
+        {qa_prompt_text}
         ---
 
         お客様の質問: {question}
@@ -101,16 +55,9 @@ def get_gemini_answer(question):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
-
-@app.route('/history')
-def get_history():
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute('SELECT sender, message FROM messages ORDER BY timestamp')
-    history = [{'sender': row['sender'], 'message': row['message']} for row in cursor.fetchall()]
-    return jsonify(history)
-
+    # 質問例のテキストをHTMLテンプレートに渡す
+    example_questions = QA_DATA.get('example_questions', [])
+    return render_template('index.html', example_questions=example_questions)
 
 @app.route('/ask', methods=['POST'])
 def ask_chatbot():
@@ -118,19 +65,8 @@ def ask_chatbot():
     if not user_message:
         return jsonify({'answer': '質問が空です。'})
 
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("INSERT INTO messages (sender, message) VALUES (?, ?)", ('user', user_message))
-    db.commit()
-
     bot_answer = get_gemini_answer(user_message)
-    cursor.execute("INSERT INTO messages (sender, message) VALUES (?, ?)", ('bot', bot_answer))
-    db.commit()
-
     return jsonify({'answer': bot_answer})
 
 if __name__ == '__main__':
-    # データベースの初期化
-    init_db()
     app.run(debug=True, port=5003)
-

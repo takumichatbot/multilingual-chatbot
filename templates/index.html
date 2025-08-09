@@ -3,19 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AIチャットボット</title>
+    <title>LARUbot</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="chatbot-container">
-        <div class="chatbot-header">LARUbot</div>
+        <div class="chatbot-header">
+            LARUbot
+        </div>
         <div class="chatbot-messages" id="chatbot-messages">
-            <div class="message bot-message">こんにちは！LARUbot(ラルボット)です！ 何か質問はありますか？(プラン説明や導入までの流れなど) </div>
+            <div class="message bot-message">こんにちは！LARUbot(ラルボット)です！ 何か質問はありますか？(プラン説明や導入までの流れなど)</div>
             <div class="example-questions-container">
-                <button class="example-btn">シンプルAIプラン</button>
-                <button class="example-btn">質問例付きAIプラン</button>
-                <button class="example-btn">カスタマイズプラン</button>
-                <button class="example-btn">ご利用の流れについて</button>
+                {% for question in example_questions %}
+                <button class="example-btn">{{ question }}</button>
+                {% endfor %}
             </div>
         </div>
         <div class="chatbot-input">
