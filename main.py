@@ -21,7 +21,7 @@ LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
 
 if not LINE_CHANNEL_ACCESS_TOKEN or not LINE_CHANNEL_SECRET:
     print("WARNING: LINE_CHANNEL_ACCESS_TOKEN or LINE_CHANNEL_SECRET is not set. LINE integration will not work.")
-    
+
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
@@ -30,57 +30,13 @@ app = Flask(__name__)
 # QAデータをプロンプトに組み込むためのテキストを作成
 qa_prompt_text = "\n\n".join([f"### {key}\n{value}" for key, value in QA_DATA['data'].items()])
 
-# ホームページ用のルーティング
-@app.route('/')
-def index():
-    example_questions = QA_DATA.get('example_questions', [])
-    return render_template('index.html', example_questions=example_questions)
-
-# ウェブサイトのチャットボット用API
-@app.route('/ask', methods=['POST'])
-def ask_chatbot():
-    user_message = request.json.get('message')
-    if not user_message:
-        return jsonify({'answer': '質問が空です。'})
-
-    bot_answer = get_gemini_answer(user_message)
-    return jsonify({'answer': bot_answer})
-
-# ★★★ LINEからのメッセージを受け取るためのルーティング ★★★
-@app.route("/callback", methods=['POST'])
-def callback():
-    # LINEサーバーからのリクエストヘッダーを取得
-    signature = request.headers['X-Line-Signature']
-    # リクエストボディを取得
-    body = request.get_data(as_text=True)
-
-    try:
-        handler.handle(body, signature)
-    except InvalidSignatureError:
-        print("Invalid signature. Please check your channel access token/secret.")
-        abort(400)
-
-    return 'OK'
-
-# メッセージイベントを処理するハンドラー
-@handler.add(MessageEvent, message=TextMessage)
-def handle_message(event):
-    user_message = event.message.text
-    # Geminiで応答を生成
-    bot_response = get_gemini_answer(user_message)
-    
-    line_bot_api.reply_message(
-        event.reply_token,
-        TextSendMessage(text=bot_response)
-    )
-
+# ★★★ get_gemini_answer関数を先に定義 ★★★
 def get_gemini_answer(question):
     print(f"質問: {question}")
     try:
         model = genai.GenerativeModel('models/gemini-1.5-flash')
         print("Geminiモデルを初期化しました")
-
-        # QA_DATAをプロンプトに組み込む
+        
         full_question = f"""
         あなたはLARUbotのカスタマーサポートAIです。
         以下の「ルール・規則」セクションに記載されている情報のみに基づいて、お客様からの質問に絵文字を使わずに丁寧に回答してください。
@@ -108,6 +64,49 @@ def get_gemini_answer(question):
     except Exception as e:
         print(f"Gemini APIエラー: {type(e).__name__} - {e}")
         return "申し訳ありませんが、現在AIが応答できません。しばらくしてから再度お試しください。"
+        
+# ★★★ ここまでget_gemini_answer関数の定義 ★★★
+
+# ホームページ用のルーティング
+@app.route('/')
+def index():
+    example_questions = QA_DATA.get('example_questions', [])
+    return render_template('index.html', example_questions=example_questions)
+
+# ウェブサイトのチャットボット用API
+@app.route('/ask', methods=['POST'])
+def ask_chatbot():
+    user_message = request.json.get('message')
+    if not user_message:
+        return jsonify({'answer': '質問が空です。'})
+
+    bot_answer = get_gemini_answer(user_message)
+    return jsonify({'answer': bot_answer})
+
+# LINEからのメッセージを受け取るためのルーティング
+@app.route("/callback", methods=['POST'])
+def callback():
+    signature = request.headers['X-Line-Signature']
+    body = request.get_data(as_text=True)
+
+    try:
+        handler.handle(body, signature)
+    except InvalidSignatureError:
+        print("Invalid signature. Please check your channel access token/secret.")
+        abort(400)
+
+    return 'OK'
+
+# メッセージイベントを処理するハンドラー
+@handler.add(MessageEvent, message=TextMessage)
+def handle_message(event):
+    user_message = event.message.text
+    bot_response = get_gemini_answer(user_message)
+    
+    line_bot_api.reply_message(
+        event.reply_token,
+        TextSendMessage(text=bot_response)
+    )
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5003))
