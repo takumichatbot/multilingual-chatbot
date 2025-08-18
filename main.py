@@ -30,13 +30,14 @@ app = Flask(__name__)
 # QAデータをプロンプトに組み込むためのテキストを作成
 qa_prompt_text = "\n\n".join([f"### {key}\n{value}" for key, value in QA_DATA['data'].items()])
 
-# ★★★ get_gemini_answer関数を先に定義 ★★★
+# ★★★ get_gemini_answer関数を一番先に定義します ★★★
+# この関数は、他の関数から呼び出されるため、一番最初に定義する必要があります。
 def get_gemini_answer(question):
     print(f"質問: {question}")
     try:
         model = genai.GenerativeModel('models/gemini-1.5-flash')
         print("Geminiモデルを初期化しました")
-        
+
         full_question = f"""
         あなたはLARUbotのカスタマーサポートAIです。
         以下の「ルール・規則」セクションに記載されている情報のみに基づいて、お客様からの質問に絵文字を使わずに丁寧に回答してください。
@@ -64,8 +65,6 @@ def get_gemini_answer(question):
     except Exception as e:
         print(f"Gemini APIエラー: {type(e).__name__} - {e}")
         return "申し訳ありませんが、現在AIが応答できません。しばらくしてから再度お試しください。"
-        
-# ★★★ ここまでget_gemini_answer関数の定義 ★★★
 
 # ホームページ用のルーティング
 @app.route('/')
@@ -101,6 +100,7 @@ def callback():
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_message = event.message.text
+    # Geminiで応答を生成
     bot_response = get_gemini_answer(user_message)
     
     line_bot_api.reply_message(
