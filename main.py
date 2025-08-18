@@ -30,8 +30,7 @@ app = Flask(__name__)
 # QAデータをプロンプトに組み込むためのテキストを作成
 qa_prompt_text = "\n\n".join([f"### {key}\n{value}" for key, value in QA_DATA['data'].items()])
 
-# ★★★ get_gemini_answer関数を一番先に定義します ★★★
-# この関数は、他の関数から呼び出されるため、一番最初に定義する必要があります。
+# get_gemini_answer関数を一番先に定義します
 def get_gemini_answer(question):
     print(f"質問: {question}")
     try:
@@ -100,15 +99,21 @@ def callback():
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_message = event.message.text
-    # Geminiで応答を生成
+    # 応答をGeminiで生成
     bot_response = get_gemini_answer(user_message)
+    
+    # AIが回答できない、またはユーザーが有人対応を希望した場合の処理
+    if "申し訳ありません" in bot_response or user_message == "有人対応希望":
+        reply_message = "ただいま担当者に転送しました。しばらくお待ちください。"
+    else:
+        # その他の場合はGeminiの応答をそのまま返す
+        reply_message = bot_response
     
     line_bot_api.reply_message(
         event.reply_token,
-        TextSendMessage(text=bot_response)
+        TextSendMessage(text=reply_message)
     )
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5003))
     app.run(host='0.0.0.0', port=port, debug=False)
-
