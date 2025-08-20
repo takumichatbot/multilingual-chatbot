@@ -1,0 +1,6 @@
+{
+    "header_title": "LARUbot",
+    "welcome_message": "こんにちは！LARUbot(ラルボット)です！ 何か質問はありますか？(プラン説明や導入までの流れなど)",
+    "input_placeholder": "メッセージを入力...",
+    "send_button": "送信"
+}

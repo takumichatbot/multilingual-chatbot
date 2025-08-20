@@ -1,0 +1,6 @@
+{
+    "header_title": "LARUbot",
+    "welcome_message": "Hello! I'm LARUbot! Do you have any questions? (e.g., about plans, the implementation process, etc.)",
+    "input_placeholder": "Enter a message...",
+    "send_button": "Send"
+}

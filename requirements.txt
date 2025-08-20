@@ -36,6 +36,7 @@ idna==3.10
 itsdangerous==2.2.0
 Jinja2==3.1.6
 jiter==0.10.0
+langdetect==1.0.9
 line-bot-sdk==3.18.1
 MarkupSafe==3.0.2
 multidict==6.6.4

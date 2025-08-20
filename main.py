@@ -1,117 +1,139 @@
 # main.py
-from flask import Flask, render_template, request, jsonify, abort
 import os
+import json
+from flask import Flask, render_template, request, jsonify, abort
 from dotenv import load_dotenv
 import google.generativeai as genai
-from qa_data import QA_DATA
+from langdetect import detect, LangDetectException
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 
 load_dotenv()
 
+# --- 設定 ---
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-if not GOOGLE_API_KEY:
-    raise ValueError("GOOGLE_API_KEY 環境変数が設定されていません。")
-genai.configure(api_key=GOOGLE_API_KEY)
-
-# LINEの認証情報を.envから読み込む
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
 
-if not LINE_CHANNEL_ACCESS_TOKEN or not LINE_CHANNEL_SECRET:
-    print("WARNING: LINE_CHANNEL_ACCESS_TOKEN or LINE_CHANNEL_SECRET is not set. LINE integration will not work.")
+if not GOOGLE_API_KEY:
+    raise ValueError("GOOGLE_API_KEY is not set.")
+genai.configure(api_key=GOOGLE_API_KEY)
 
+# --- LINE APIの初期化 ---
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 app = Flask(__name__)
 
-# QAデータをプロンプトに組み込むためのテキストを作成
-qa_prompt_text = "\n\n".join([f"### {key}\n{value}" for key, value in QA_DATA['data'].items()])
+# --- 多言語ナレッジベースとプロンプトの読み込み ---
+def load_json_files(directory):
+    data = {}
+    for filename in os.listdir(directory):
+        if filename.endswith('.json'):
+            lang = filename.split('.')[0]
+            with open(os.path.join(directory, filename), 'r', encoding='utf-8') as f:
+                data[lang] = json.load(f)
+    return data
 
-# get_gemini_answer関数を一番先に定義します
-def get_gemini_answer(question):
-    print(f"質問: {question}")
+knowledge_bases = load_json_files('knowledge')
+prompts = {
+    'ja': {
+        "system_role": "あなたはLARUbotのカスタマーサポートAIです。以下の「ルール・規則」セクションに記載されている情報のみに基づいて、お客様からの質問に絵文字を使わずに丁寧に回答してください。**記載されていない質問には「申し訳ありませんが、その情報はこのQ&Aには含まれていません。」と答えてください。**お客様がスムーズに手続きを進められるよう、元気で丁寧な言葉遣いで案内してください。",
+        "not_found": "申し訳ありませんが、その情報はこのQ&Aには含まれていません。",
+        "error": "申し訳ありませんが、現在AIが応答できません。しばらくしてから再度お試しください。"
+    },
+    'en': {
+        "system_role": "You are a customer support AI for LARUbot. Based only on the information provided in the 'Rules & Regulations' section below, please answer customer questions politely and without using emojis. **If a question is not covered, reply with 'I'm sorry, but that information is not included in this Q&A.'** Please use a cheerful and polite tone to guide customers smoothly.",
+        "not_found": "I'm sorry, but that information is not included in this Q&A.",
+        "error": "Sorry, the AI is currently unable to respond. Please try again later."
+    }
+}
+
+# --- 言語判定関数 ---
+def detect_language(text):
+    try:
+        lang = detect(text)
+        # サポートしている言語かチェック (ここでは日本語と英語)
+        return lang if lang in ['ja', 'en'] else 'ja'
+    except LangDetectException:
+        return 'ja' # 判定不能な場合はデフォルトで日本語に
+
+# --- Gemini応答生成関数 (多言語対応) ---
+def get_gemini_answer(question, lang):
+    print(f"質問: {question} (言語: {lang})")
+    
+    # 言語に応じたナレッジベースとプロンプトを選択
+    qa_data = knowledge_bases.get(lang, knowledge_bases['ja'])
+    prompt_data = prompts.get(lang, prompts['ja'])
+    
+    qa_prompt_text = "\n\n".join([f"### {key}\n{value}" for key, value in qa_data['data'].items()])
+
     try:
         model = genai.GenerativeModel('models/gemini-1.5-flash')
-        print("Geminiモデルを初期化しました")
-
+        
         full_question = f"""
-        あなたはLARUbotのカスタマーサポートAIです。
-        以下の「ルール・規則」セクションに記載されている情報のみに基づいて、お客様からの質問に絵文字を使わずに丁寧に回答してください。
-        **記載されていない質問には「申し訳ありませんが、その情報はこのQ&Aには含まれていません。」と答えてください。**
-        お客様がスムーズに手続きを進められるよう、元気で丁寧な言葉遣いで案内してください。
+        {prompt_data['system_role']}
         
         ---
-        ## ルール・規則
+        ## ルール・規則 (Rules & Regulations)
         {qa_prompt_text}
         ---
 
-        お客様の質問: {question}
+        お客様の質問 (Customer's Question): {question}
         """
 
-        print("Gemini APIにリクエストを送信します...")
         response = model.generate_content(full_question, request_options={'timeout': 30})
-        print("Gemini APIから応答を受け取りました")
 
         if response and response.text:
             return response.text.strip()
         else:
-            print("APIから応答がありませんでした。")
-            return "申し訳ありませんが、その質問にはお答えできませんでした。別の質問をしてください。"
+            return prompt_data['not_found']
 
     except Exception as e:
         print(f"Gemini APIエラー: {type(e).__name__} - {e}")
-        return "申し訳ありませんが、現在AIが応答できません。しばらくしてから再度お試しください。"
+        return prompt_data['error']
 
-# ホームページ用のルーティング
+# --- Flaskルーティング ---
 @app.route('/')
 def index():
-    example_questions = QA_DATA.get('example_questions', [])
+    # デフォルトは日本語の質問例を表示
+    example_questions = knowledge_bases['ja'].get('example_questions', [])
     return render_template('index.html', example_questions=example_questions)
 
-# ウェブサイトのチャットボット用API
 @app.route('/ask', methods=['POST'])
 def ask_chatbot():
     user_message = request.json.get('message')
     if not user_message:
         return jsonify({'answer': '質問が空です。'})
 
-    bot_answer = get_gemini_answer(user_message)
-    return jsonify({'answer': bot_answer})
+    # ユーザーの質問の言語を判定
+    lang = detect_language(user_message)
+    
+    bot_answer = get_gemini_answer(user_message, lang)
+    return jsonify({'answer': bot_answer, 'lang': lang})
 
-# LINEからのメッセージを受け取るためのルーティング
 @app.route("/callback", methods=['POST'])
 def callback():
     signature = request.headers['X-Line-Signature']
     body = request.get_data(as_text=True)
-
     try:
         handler.handle(body, signature)
     except InvalidSignatureError:
-        print("Invalid signature. Please check your channel access token/secret.")
         abort(400)
-
     return 'OK'
 
-# メッセージイベントを処理するハンドラー
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_message = event.message.text
-    # 応答をGeminiで生成
-    bot_response = get_gemini_answer(user_message)
+    # ユーザーの質問の言語を判定
+    lang = detect_language(user_message)
     
-    # AIが回答できない、またはユーザーが有人対応を希望した場合の処理
-    if "申し訳ありません" in bot_response or user_message == "有人対応希望":
-        reply_message = "ただいま担当者に転送しました。しばらくお待ちください。"
-    else:
-        # その他の場合はGeminiの応答をそのまま返す
-        reply_message = bot_response
+    bot_response = get_gemini_answer(user_message, lang)
     
     line_bot_api.reply_message(
         event.reply_token,
-        TextSendMessage(text=reply_message)
+        TextSendMessage(text=bot_response)
     )
 
 if __name__ == '__main__':
