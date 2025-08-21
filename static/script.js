@@ -7,20 +7,22 @@ let knowledgeBases = {}; // ナレッジベースを保持
 
 // UIのテキストを翻訳する関数
 async function setLanguage(lang) {
-    if (translations[lang] && knowledgeBases[lang]) {
-        updateUI(lang);
-    } else {
-        try {
+    // 同じ言語が選択された場合は何もしない
+    if (lang === currentLang && translations[lang]) return;
+
+    try {
+        // 翻訳ファイルがキャッシュになければフェッチする
+        if (!translations[lang] || !knowledgeBases[lang]) {
             const [transRes, knowledgeRes] = await Promise.all([
                 fetch(`/static/translations/${lang}.json`),
                 fetch(`/static/knowledge/${lang}.json`)
             ]);
             translations[lang] = await transRes.json();
             knowledgeBases[lang] = await knowledgeRes.json();
-            updateUI(lang);
-        } catch (error) {
-            console.error('Failed to load language files:', error);
         }
+        updateUI(lang);
+    } catch (error) {
+        console.error('Failed to load language files:', error);
     }
 }
 
@@ -31,7 +33,7 @@ function updateUI(lang) {
     // 静的テキストを更新
     document.querySelectorAll('[data-i18n-key]').forEach(el => {
         const key = el.getAttribute('data-i18n-key');
-        if (translations[lang][key]) {
+        if (translations[lang] && translations[lang][key]) {
             el.textContent = translations[lang][key];
         }
     });
@@ -39,30 +41,43 @@ function updateUI(lang) {
     // プレースホルダーを更新
     document.querySelectorAll('[data-i18n-key-placeholder]').forEach(el => {
         const key = el.getAttribute('data-i18n-key-placeholder');
-        if (translations[lang][key]) {
+        if (translations[lang] && translations[lang][key]) {
             el.placeholder = translations[lang][key];
         }
     });
 
     // 質問例を更新
     const examplesContainer = document.getElementById('example-questions-container');
-    examplesContainer.innerHTML = '';
-    knowledgeBases[lang].example_questions.forEach(q => {
-        const button = document.createElement('button');
-        button.className = 'example-btn';
-        button.textContent = q;
-        button.onclick = () => sendMessage(q);
-        examplesContainer.appendChild(button);
-    });
+    examplesContainer.innerHTML = ''; // コンテナをクリア
+    if (knowledgeBases[lang] && knowledgeBases[lang].example_questions) {
+        knowledgeBases[lang].example_questions.forEach(q => {
+            const button = document.createElement('button');
+            button.className = 'example-btn';
+            button.textContent = q;
+            button.onclick = () => sendMessage(q);
+            examplesContainer.appendChild(button);
+        });
+    }
 }
 // --- ここまで ---
 
 
 document.addEventListener('DOMContentLoaded', () => {
+    // ===== ▼▼▼ ここから修正 ▼▼▼ =====
+    // 言語スイッチャーのボタンにイベントを設定
+    const jaButton = document.getElementById('lang-ja');
+    const enButton = document.getElementById('lang-en');
+
+    if (jaButton) {
+        jaButton.addEventListener('click', () => setLanguage('ja'));
+    }
+    if (enButton) {
+        enButton.addEventListener('click', () => setLanguage('en'));
+    }
+    // ===== ▲▲▲ ここまで修正 ▲▲▲ =====
+
     // ページ読み込み時にデフォルト言語(日本語)を設定
     setLanguage('ja');
-    
-    // 質問例ボタンの初期設定はsetLanguage内で行うため、ここは削除
     
     const messagesContainer = document.getElementById('chatbot-messages');
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -84,7 +99,7 @@ async function sendMessage(message = null) {
         const response = await fetch('/ask', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: userMessage }) // langはバックエンドで判定
+            body: JSON.stringify({ message: userMessage })
         });
 
         if (!response.ok) {
@@ -105,7 +120,6 @@ async function sendMessage(message = null) {
     }
 }
 
-// addMessageToChat, removeLoadingMessage, handleKeyPress 関数は変更なし
 function addMessageToChat(sender, message, isLoading = false, id = null) {
     const messagesContainer = document.getElementById('chatbot-messages');
     const messageDiv = document.createElement('div');
