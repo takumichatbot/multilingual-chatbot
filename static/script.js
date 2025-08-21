@@ -1,10 +1,12 @@
-// script.js
+// script.js (イベント委任方式による最終修正版)
 
-// ===== ▼▼▼ 修正点：主要な関数をグローバルスコープに移動 ▼▼▼ =====
 let currentLang = 'ja';
 let translations = {};
 let knowledgeBases = {};
 
+// --- 関数定義 ---
+
+// 言語データを読み込み、UIを更新するメイン関数
 async function setLanguage(lang) {
     if (lang === currentLang && translations[lang]) return;
     try {
@@ -22,6 +24,7 @@ async function setLanguage(lang) {
     }
 }
 
+// UIの表示を更新する関数
 function updateUI(lang) {
     currentLang = lang;
     document.documentElement.lang = lang;
@@ -44,24 +47,12 @@ function updateUI(lang) {
             const button = document.createElement('button');
             button.className = 'example-btn';
             button.textContent = q;
-            button.onclick = () => sendMessage(q);
             examplesContainer.appendChild(button);
         });
     }
 }
-// ===== ▲▲▲ ここまで ▲▲▲ =====
 
-document.addEventListener('DOMContentLoaded', () => {
-    // ページ読み込み時にデフォルト言語(日本語)を設定
-    setLanguage('ja');
-
-    // 質問例ボタンにイベントリスナーを再設定（言語切り替え時に動的に生成されるため）
-    // この処理は updateUI 内に移動しました
-    
-    const messagesContainer = document.getElementById('chatbot-messages');
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-});
-
+// メッセージを送信する関数
 async function sendMessage(message = null) {
     const userInput = document.getElementById('user-input');
     const userMessage = message || userInput.value.trim();
@@ -90,6 +81,7 @@ async function sendMessage(message = null) {
     }
 }
 
+// チャットにメッセージを追加する関数
 function addMessageToChat(sender, message, isLoading = false, id = null) {
     const messagesContainer = document.getElementById('chatbot-messages');
     const messageDiv = document.createElement('div');
@@ -98,24 +90,54 @@ function addMessageToChat(sender, message, isLoading = false, id = null) {
         messageDiv.classList.add('loading-message');
         if (id) messageDiv.id = id;
     }
-    const linkifiedMessage = message.replace(
-        /(https?:\/\/[^\s<>"'()]+)/g,
-        '<a href="$1" target="_blank" rel="noopener noreferrer" style="color: #667eea;">$1</a>'
-    );
-    messageDiv.innerHTML = linkifiedMessage; 
+    const linkifiedMessage = message.replace(/(https?:\/\/[^\s<>"'()]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color: #667eea;">$1</a>');
+    messageDiv.innerHTML = linkifiedMessage;
     messagesContainer.appendChild(messageDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
+// ローディングメッセージを削除する関数
 function removeLoadingMessage(id) {
     const loadingMessageElement = document.getElementById(id);
-    if (loadingMessageElement) {
-        loadingMessageElement.remove();
-    }
+    if (loadingMessageElement) loadingMessageElement.remove();
 }
 
+// Enterキーで送信する関数
 function handleKeyPress(event) {
-    if (event.key === 'Enter') {
-        sendMessage();
-    }
+    if (event.key === 'Enter') sendMessage();
 }
+
+// --- イベントリスナー設定 ---
+
+document.addEventListener('DOMContentLoaded', () => {
+    
+    // 言語スイッチャーのイベント委任
+    const langSwitcher = document.querySelector('.language-switcher');
+    if (langSwitcher) {
+        langSwitcher.addEventListener('click', (event) => {
+            const lang = event.target.getAttribute('data-lang');
+            if (lang) {
+                setLanguage(lang);
+            }
+        });
+    }
+
+    // 質問例ボタンのイベント委任
+    const examplesContainer = document.getElementById('example-questions-container');
+    if (examplesContainer) {
+        examplesContainer.addEventListener('click', (event) => {
+            if (event.target.classList.contains('example-btn')) {
+                sendMessage(event.target.textContent);
+            }
+        });
+    }
+
+    // 送信ボタン
+    const sendButton = document.getElementById('send-button');
+    if(sendButton) {
+        sendButton.addEventListener('click', () => sendMessage());
+    }
+
+    // 初期言語を設定
+    setLanguage('ja');
+});
