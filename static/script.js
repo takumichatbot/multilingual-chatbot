@@ -1,17 +1,13 @@
 // script.js
 
-// --- 多言語対応のための追加 ---
-let currentLang = 'ja'; // 現在の言語を保持
-let translations = {}; // 翻訳データを保持
-let knowledgeBases = {}; // ナレッジベースを保持
+// ===== ▼▼▼ 修正点：主要な関数をグローバルスコープに移動 ▼▼▼ =====
+let currentLang = 'ja';
+let translations = {};
+let knowledgeBases = {};
 
-// UIのテキストを翻訳する関数
 async function setLanguage(lang) {
-    // 同じ言語が選択された場合は何もしない
     if (lang === currentLang && translations[lang]) return;
-
     try {
-        // 翻訳ファイルがキャッシュになければフェッチする
         if (!translations[lang] || !knowledgeBases[lang]) {
             const [transRes, knowledgeRes] = await Promise.all([
                 fetch(`/static/translations/${lang}.json`),
@@ -28,27 +24,21 @@ async function setLanguage(lang) {
 
 function updateUI(lang) {
     currentLang = lang;
-    document.documentElement.lang = lang; // htmlのlang属性を更新
-
-    // 静的テキストを更新
+    document.documentElement.lang = lang;
     document.querySelectorAll('[data-i18n-key]').forEach(el => {
         const key = el.getAttribute('data-i18n-key');
         if (translations[lang] && translations[lang][key]) {
             el.textContent = translations[lang][key];
         }
     });
-
-    // プレースホルダーを更新
     document.querySelectorAll('[data-i18n-key-placeholder]').forEach(el => {
         const key = el.getAttribute('data-i18n-key-placeholder');
         if (translations[lang] && translations[lang][key]) {
             el.placeholder = translations[lang][key];
         }
     });
-
-    // 質問例を更新
     const examplesContainer = document.getElementById('example-questions-container');
-    examplesContainer.innerHTML = ''; // コンテナをクリア
+    examplesContainer.innerHTML = '';
     if (knowledgeBases[lang] && knowledgeBases[lang].example_questions) {
         knowledgeBases[lang].example_questions.forEach(q => {
             const button = document.createElement('button');
@@ -59,25 +49,14 @@ function updateUI(lang) {
         });
     }
 }
-// --- ここまで ---
-
+// ===== ▲▲▲ ここまで ▲▲▲ =====
 
 document.addEventListener('DOMContentLoaded', () => {
-    // ===== ▼▼▼ ここから修正 ▼▼▼ =====
-    // 言語スイッチャーのボタンにイベントを設定
-    const jaButton = document.getElementById('lang-ja');
-    const enButton = document.getElementById('lang-en');
-
-    if (jaButton) {
-        jaButton.addEventListener('click', () => setLanguage('ja'));
-    }
-    if (enButton) {
-        enButton.addEventListener('click', () => setLanguage('en'));
-    }
-    // ===== ▲▲▲ ここまで修正 ▲▲▲ =====
-
     // ページ読み込み時にデフォルト言語(日本語)を設定
     setLanguage('ja');
+
+    // 質問例ボタンにイベントリスナーを再設定（言語切り替え時に動的に生成されるため）
+    // この処理は updateUI 内に移動しました
     
     const messagesContainer = document.getElementById('chatbot-messages');
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -86,30 +65,21 @@ document.addEventListener('DOMContentLoaded', () => {
 async function sendMessage(message = null) {
     const userInput = document.getElementById('user-input');
     const userMessage = message || userInput.value.trim();
-
     if (userMessage === '') return;
-
     addMessageToChat('user', userMessage);
     userInput.value = '';
-
     const loadingMessageId = 'loading-' + new Date().getTime();
     addMessageToChat('bot', '...', true, loadingMessageId);
-
     try {
         const response = await fetch('/ask', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: userMessage })
         });
-
-        if (!response.ok) {
-            throw new Error(`サーバーエラー: ${response.status}`);
-        }
-
+        if (!response.ok) throw new Error(`サーバーエラー: ${response.status}`);
         const data = await response.json();
         removeLoadingMessage(loadingMessageId);
         addMessageToChat('bot', data.answer);
-
     } catch (error) {
         console.error('Fetchエラー:', error);
         removeLoadingMessage(loadingMessageId);
@@ -124,21 +94,15 @@ function addMessageToChat(sender, message, isLoading = false, id = null) {
     const messagesContainer = document.getElementById('chatbot-messages');
     const messageDiv = document.createElement('div');
     messageDiv.classList.add('message', `${sender}-message`);
-
     if (isLoading) {
         messageDiv.classList.add('loading-message');
-        if (id) {
-            messageDiv.id = id;
-        }
+        if (id) messageDiv.id = id;
     }
-
     const linkifiedMessage = message.replace(
         /(https?:\/\/[^\s<>"'()]+)/g,
         '<a href="$1" target="_blank" rel="noopener noreferrer" style="color: #667eea;">$1</a>'
     );
-    
     messageDiv.innerHTML = linkifiedMessage; 
-
     messagesContainer.appendChild(messageDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
