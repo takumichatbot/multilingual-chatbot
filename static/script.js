@@ -115,10 +115,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const langSwitcher = document.querySelector('.language-switcher');
     if (langSwitcher) {
         langSwitcher.addEventListener('click', (event) => {
-            const lang = event.target.getAttribute('data-lang');
-            if (lang) {
+            // ===== ▼▼▼ ここを修正 ▼▼▼ =====
+            // クリックされた要素、またはその親から `data-lang` 属性を持つ要素を探す
+            const button = event.target.closest('[data-lang]');
+            if (button) {
+                const lang = button.getAttribute('data-lang');
                 setLanguage(lang);
             }
+            // ===== ▲▲▲ ここまで ▲▲▲ =====
         });
     }
 
