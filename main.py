@@ -1,4 +1,3 @@
-# main.py
 import os
 import json
 from flask import Flask, render_template, request, jsonify, abort
@@ -36,7 +35,10 @@ def load_json_files(directory):
                 data[lang] = json.load(f)
     return data
 
-knowledge_bases = load_json_files('knowledge')
+# ===== ▼▼▼ ここのパスを修正しました ▼▼▼ =====
+knowledge_bases = load_json_files('static/knowledge')
+# ===== ▲▲▲ ここまで ▲▲▲ =====
+
 prompts = {
     'ja': {
         "system_role": "あなたはLARUbotのカスタマーサポートAIです。以下の「ルール・規則」セクションに記載されている情報のみに基づいて、お客様からの質問に絵文字を使わずに丁寧に回答してください。**記載されていない質問には「申し訳ありませんが、その情報はこのQ&Aには含まれていません。」と答えてください。**お客様がスムーズに手続きを進められるよう、元気で丁寧な言葉遣いで案内してください。",
@@ -54,16 +56,14 @@ prompts = {
 def detect_language(text):
     try:
         lang = detect(text)
-        # サポートしている言語かチェック (ここでは日本語と英語)
         return lang if lang in ['ja', 'en'] else 'ja'
     except LangDetectException:
-        return 'ja' # 判定不能な場合はデフォルトで日本語に
+        return 'ja' 
 
 # --- Gemini応答生成関数 (多言語対応) ---
 def get_gemini_answer(question, lang):
     print(f"質問: {question} (言語: {lang})")
     
-    # 言語に応じたナレッジベースとプロンプトを選択
     qa_data = knowledge_bases.get(lang, knowledge_bases['ja'])
     prompt_data = prompts.get(lang, prompts['ja'])
     
@@ -97,7 +97,6 @@ def get_gemini_answer(question, lang):
 # --- Flaskルーティング ---
 @app.route('/')
 def index():
-    # デフォルトは日本語の質問例を表示
     example_questions = knowledge_bases['ja'].get('example_questions', [])
     return render_template('index.html', example_questions=example_questions)
 
@@ -107,7 +106,6 @@ def ask_chatbot():
     if not user_message:
         return jsonify({'answer': '質問が空です。'})
 
-    # ユーザーの質問の言語を判定
     lang = detect_language(user_message)
     
     bot_answer = get_gemini_answer(user_message, lang)
@@ -126,7 +124,6 @@ def callback():
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_message = event.message.text
-    # ユーザーの質問の言語を判定
     lang = detect_language(user_message)
     
     bot_response = get_gemini_answer(user_message, lang)
